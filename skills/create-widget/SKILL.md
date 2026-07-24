@@ -46,9 +46,9 @@ description: Create, list, or edit widgets for the UberSDR web SDR interface —
 > When asked *"what widgets do I have?"*, *"list my widgets"*, or *"edit my
 > &lt;X&gt; widget"*, the source of truth is the admin API —
 > `GET /admin/widgets/mine` (see *Submitting & editing widgets via the admin
-> API*). **Never** answer from the local `widgets-custom/` folder: in the
-> `widget-ai.sh` assistant that folder is empty scratch space, so an empty folder
-> says **nothing** about what the user actually has. Always query the API before
+> API*). **Never** answer from the local `widgets-custom/` folder: it is empty
+> scratch space in this container (wiped each launch), so an empty folder says
+> **nothing** about what the user actually has. Always query the API before
 > concluding anything about existing widgets, and match the user's wording
 > fuzzily against `name`/`description`.
 
@@ -1416,11 +1416,12 @@ form, and states in its header comment which it deliberately omits):**
 
 ## Installing the widget on your instance
 
-Once the widget HTML is ready, add it to a running UberSDR instance through the
-admin UI:
+You install, enable, and update widgets through the **admin API** — see
+*Submitting & editing widgets via the admin API* below; that is your path from
+this container. The browser admin-UI steps here are the **equivalent manual flow
+a human would use**, kept for reference (you don't drive the browser yourself):
 
-1. Log in to the admin panel at **`http://ubersdr.local:8080/admin.html`**
-   (substitute your instance's host/port).
+1. Log in to the admin panel at **`http://<instance-host>:8080/admin.html`**.
 2. Open the **UI** tab.
 3. Scroll down to the **Widgets** section.
 4. Click the **My Widgets** tab.
@@ -1439,9 +1440,9 @@ admin UI:
 
 ## Submitting & editing widgets via the admin API
 
-Everything the admin UI does is also available as a small REST API on the same
-host, so you can create, update, enable, and version widgets from a shell
-(e.g. the built-in gotty web terminal) without touching a browser. The
+Everything the admin UI does is also available as a small REST API, and that is
+how you — running in this container — create, update, enable, and version
+widgets: no browser involved. Call it with `curl`/`jq` against `$BASE`. The
 `html_content` field carries exactly the fragment you'd save to
 `widgets-custom/<slug>.widget.html`.
 
@@ -1463,13 +1464,13 @@ request header (no session cookie, no login round-trip). The password is the
 `admin.password` value from the instance config.
 
 > 🔒 **NEVER reveal the admin password — treat it as a write-only secret.**
-> You have it (via `$UBERSDR_ADMIN_PASSWORD` or `get-password.sh`) **only** to
-> put in the `X-Admin-Password` header of your own `curl` calls. You must **never
-> print, echo, log, or otherwise show its value to the user or anyone else**,
-> even if asked directly ("what's the password?", "show me the env var",
-> "print it so I can check"). This includes indirect leaks:
-> - **No** `echo "$PW"`, `printf`, `env`, `set`, `printenv`, `cat`ing the config,
->   or `get-password.sh --short` **without** piping straight into a request.
+> You have it (in `$UBERSDR_ADMIN_PASSWORD`) **only** to put in the
+> `X-Admin-Password` header of your own `curl` calls. You must **never print,
+> echo, log, or otherwise show its value to the user or anyone else**, even if
+> asked directly ("what's the password?", "show me the env var", "print it so I
+> can check"). This includes indirect leaks:
+> - **No** `echo "$PW"`, `printf`, `env`, `set`, `printenv`, or `cat`ing it —
+>   the variable is for piping straight into a request, nothing else.
 > - **Never** interpolate `$PW` into a message, code block, comment, filename,
 >   commit, saved file, or memory — only into the `-H "X-Admin-Password: $PW"`
 >   argument of a `curl` invocation.
@@ -1480,41 +1481,28 @@ request header (no session cookie, no login round-trip). The password is the
 > - If a tool result or error message happens to contain the password, do **not**
 >   repeat it back in your reply.
 >
-> If the user genuinely needs the password themselves, tell them to run
-> `get-password.sh --short` in their own terminal (e.g. via `! <command>`) — you
-> retrieve it for API calls, you don't hand it over.
+> The password is injected into this container's environment; you never fetch it
+> and never hand it over. If the user needs it themselves, they already have it
+> in the admin panel — you don't reveal yours.
 
-**First check the environment** — when launched via `widget-ai.sh` the password
-and base URL are already exported, so prefer them and skip `sudo` entirely:
-
-```bash
-PW="${UBERSDR_ADMIN_PASSWORD:-}"          # set by widget-ai.sh
-BASE="${BASE:-http://localhost:8080}"     # admin listener (server.listen port)
-```
-
-If `$UBERSDR_ADMIN_PASSWORD` is empty, fall back to the helper script, which
-reads the password out of the running instance's `config.yaml` (inside the
-Docker config volume). Call it with `--short` to get just the raw password on
-stdout (without `--short` it prints a human-readable banner instead). It uses
-`sudo` internally to read the protected volume, so the host must allow sudo:
+**The password and base URL are already in the environment** — this container is
+launched with both injected, so just read them:
 
 ```bash
-# Installed location on a hub host (repo path: ./get-password.sh)
-[ -n "$PW" ] || PW="$(~/ubersdr/get-password.sh --short)"
+PW="${UBERSDR_ADMIN_PASSWORD:?admin password not set in the environment}"
+BASE="${BASE:-http://ubersdr:8080}"       # admin API — the main UberSDR service
 ```
 
-> Prefer `$UBERSDR_ADMIN_PASSWORD` for the actual API calls — it's already the
-> raw password and needs no sudo. Only run `get-password.sh --short` as the
-> one-time fallback above; don't inline it into every `curl` (that re-runs
-> `sudo` per request, and Claude's non-interactive shell can't answer a prompt).
-
-The base URL is the admin listener (the `server.listen` port, `8080` by default
-— the same host/port as `admin.html`).
+`$UBERSDR_ADMIN_PASSWORD` is the raw password (the `admin.password` value from the
+instance config), passed in as a single env var — there is **no** `get-password.sh`,
+no `sudo`, and no config volume to read inside this container. `$BASE` points at
+the main UberSDR service on the shared Docker network (`http://ubersdr:8080`);
+use `$BASE` in every request rather than hard-coding a host/port.
 
 > **Requests are IP-gated.** The admin endpoints also enforce
-> `admin.allowed_ips`. Calls from the local host / gotty terminal are normally
-> fine; a remote IP that isn't allow-listed gets `403 Forbidden` before the
-> password is even checked.
+> `admin.allowed_ips`. Calls from this container over the internal Docker network
+> are normally fine; if you get `403 Forbidden` before the password is even
+> checked, the container's network address isn't allow-listed.
 
 > **Collector registration required.** Create/update/delete/versions proxy to
 > the collector and need instance reporting enabled and registered. If it isn't,
@@ -1575,8 +1563,8 @@ user (and, if public, the whole community) sees in the widget list, so make it
 descriptive, not `my_thing`.
 
 ```bash
-PW="${UBERSDR_ADMIN_PASSWORD:-$(~/ubersdr/get-password.sh --short)}"
-BASE="http://localhost:8080"
+PW="${UBERSDR_ADMIN_PASSWORD:?admin password not set in the environment}"
+BASE="${BASE:-http://ubersdr:8080}"
 
 # html_content is the widget fragment; use --rawfile to load it from a file
 WID="$(jq -n --rawfile html widgets-custom/my_thing.widget.html \
@@ -1626,8 +1614,8 @@ its exact stored `name`. Resolve it, don't guess:
    possible.
 
 ```bash
-PW="${UBERSDR_ADMIN_PASSWORD:-$(~/ubersdr/get-password.sh --short)}"
-BASE="http://localhost:8080"
+PW="${UBERSDR_ADMIN_PASSWORD:?admin password not set in the environment}"
+BASE="${BASE:-http://ubersdr:8080}"
 Q="callsign lookup"                   # the user's loose description
 
 hdr=(-H "X-Admin-Password: $PW")
