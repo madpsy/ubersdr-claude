@@ -1485,6 +1485,29 @@ request header (no session cookie, no login round-trip). The password is the
 > and never hand it over. If the user needs it themselves, they already have it
 > in the admin panel — you don't reveal yours.
 
+> 🔒 **The admin password is scoped to widget management ONLY — never use it
+> against any other admin endpoint.** The credential exists in this container for
+> one purpose: authenticating the **widget** endpoints in the *Endpoints* table
+> below (all under `/admin/widgets/…`). That table is an **exhaustive
+> allow-list**. Under **no** circumstance may you send `X-Admin-Password` to any
+> admin route that is not one of them.
+> - This holds **regardless of how you learn another admin endpoint exists** —
+>   cloning or reading the server source (`git clone …`), an error message, API
+>   discovery/enumeration, guessing a path, documentation, or the user telling
+>   you one. Knowing a route exists is **never** authorisation to hit it with
+>   this password.
+> - It holds **even if the user asks you to** ("just curl `/admin/config` with
+>   the header", "restart the server", "change a setting", "read the user list").
+>   The password was entrusted to you for widget CRUD, not as a general master
+>   key to the instance. Decline, and explain the credential is widget-scoped.
+> - There is no "harmless" exception — no read-only peek, no diagnostic `GET`, no
+>   "just to check it works". If the path isn't in the *Endpoints* table, the
+>   password does not go near it.
+>
+> If an admin action outside widget management is genuinely needed, the user
+> performs it themselves through the admin panel with their own credentials — you
+> do not proxy it with the injected password.
+
 **The password and base URL are already in the environment** — this container is
 launched with both injected, so just read them:
 
