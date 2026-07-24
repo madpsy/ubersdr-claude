@@ -339,6 +339,51 @@ values exactly unless you have a strong reason to deviate.
 <span id="mywidget-close" title="Dismiss">&#x2715;</span>
 ```
 
+### Make the header fit — avoid the "✕ too far right" gap
+
+A common defect: the ✕ ends up stranded far to the right of the title, with a big
+empty gap between them. **Understand why, then size the widget so it can't
+happen.**
+
+**Why it happens.** The header is `display:flex; justify-content:space-between`
+and the title carries `margin-right:auto`, so the ✕ is always pinned to the
+header's **right edge**. The header is as wide as the widget, and the container
+CSS uses `white-space:nowrap` with **no width set**, so the widget grows to its
+**widest child** — usually a body row, not the title. A short title above a wide
+body therefore leaves the ✕ far out to the right. This is a **layout-fit bug, not
+a positioning value to nudge** — don't try to fix it by adding a right margin or
+absolutely positioning the ✕.
+
+**Fix by constraining the width, exactly like the bundled widgets do:**
+
+- **Give the widget a width that suits its content**, so the header doesn't
+  stretch past what the title needs. Real examples: `voice` uses `width:180px`,
+  `qrz_lookup` uses `min-width:160px; max-width:220px`, `cw_spots` uses
+  `min-width:180px`. Pick a fixed `width` (or a `min`/`max-width` band) that fits
+  both the header and the body — don't leave the container width-free when the
+  body can be wide.
+- **If the title itself can be long,** let it shrink instead of forcing the
+  widget wider: on the title add `min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap` (the body-value trick `qrz_lookup`
+  uses). The widget's outer `white-space:nowrap` otherwise makes every long
+  string expand the panel.
+- **Keep `flex-shrink:0` on both the collapse arrow and the ✕** (the close CSS
+  already has it) so they're never squeezed, and keep the header's right padding
+  (`padding: 5px 8px 4px 9px`) so the ✕ sits *inside* the panel, not jammed
+  against the edge or clipped.
+- **Leave the ✕ as a normal flex child** — never `position:absolute` it. As a
+  flex child it tracks the padded right edge at every width; absolute positioning
+  desyncs from the header and overflows.
+
+**Then verify it actually fits.** You can't see the rendered widget from this
+container, so reason it through explicitly before submitting: with the title,
+arrow, and ✕ laid out, is the widget's width driven by the header or by a wider
+body row? If a body row is wider, the ✕ *will* gap out — constrain the width or
+narrow that row. When remote access is available (`/remote-control`) or you're
+iterating with the user, have them confirm the header reads
+`[▸ TITLE … ✕]` with the ✕ neatly at the top-right, nothing overflowing or
+clipped, on both the expanded and collapsed states.
+
 ### Mobile hiding (standard panels)
 
 A floating-panel widget **must** hide itself on narrow screens and real mobile
@@ -1345,6 +1390,37 @@ fetch('/api/lookup?callsign=' + encodeURIComponent(callsign) + '&uuid=' + encode
   .catch(function (err) { /* show error */ });
 ```
 
+### Verifying a public API's response shape from the container
+
+When a widget you're building will consume a server endpoint, **you may query
+the instance's public API endpoints yourself to confirm the real response shape**
+(field names, nesting, types) instead of guessing — this is legitimate work in
+service of building the widget. Use the **same `$BASE`** the widget will hit
+(`http://ubersdr:8080` on the shared Docker network), with plain `curl` and `jq`:
+
+```bash
+BASE="${BASE:-http://ubersdr:8080}"
+curl -s "$BASE/api/description"        | jq '.'          # full description object
+curl -s "$BASE/api/cty/countries"      | jq '.data.countries[0]'   # one sample row
+```
+
+Scope and rules:
+
+- **Public `/api/*` endpoints only, and only ones a widget legitimately calls**
+  (e.g. `/api/description`, `/api/cty/countries`, `/api/cty/continents`). This is
+  read-only shape verification, nothing more.
+- **These are unauthenticated — send NO credential.** Do **not** add
+  `X-Admin-Password` to a public `/api/*` request. This is entirely separate from
+  the admin-password rule: that password is *only* for the widget `/admin/…`
+  endpoints (see *Authentication*), and public endpoints neither need nor should
+  receive it. Querying public APIs here does **not** widen that scope.
+- **Some endpoints need session state a bare `curl` won't have** — e.g.
+  `/api/lookup` returns **401** without an active audio session, and others are
+  UUID-gated. A 401/403 there is expected from the container; read the shape from
+  the reference/source instead of trying to force a session.
+- Keep it minimal and same-origin to `$BASE` — a couple of calls to see the
+  shape, not crawling or load-testing the instance.
+
 ---
 
 ## HTML escaping helper (always use for user/server data)
@@ -1515,6 +1591,7 @@ note at the top; a behavioural or fixed-control widget applies only what fits it
 form, and states in its header comment which it deliberately omits):**
 - [ ] **✕ Close button** in the header — `dismissed` flag checked everywhere the widget could reappear *(any widget with visible UI)*
 - [ ] **Collapse/expand arrow** left of the title — collapses to the title bar; state persisted to `<slug>_widget_collapsed` and restored on load; excluded from the drag-start guard *(any widget with a title bar)*
+- [ ] **Header fits** — widget width constrained (fixed `width` or `min`/`max-width`) so the ✕ sits neatly at the top-right, not stranded far right by a wider body row; arrow + ✕ have `flex-shrink:0`; nothing overflows or clips, expanded **and** collapsed *(see "Make the header fit")*
 - [ ] **Mobile hiding** — `@media (max-width: 768px)` + `html.is-mobile` CSS + JS guard *(any widget with visible UI)*
 - [ ] **Drag-to-reposition** — `mousedown`/`mousemove`/`mouseup` + `localStorage` persistence *(free-floating widgets; skip if intentionally anchored)*
 
