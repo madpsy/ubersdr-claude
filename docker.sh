@@ -144,6 +144,9 @@ push() {
         "$TMPCTX"
     echo "Pushed multi-arch manifest: $IMAGE"
 
+    # Scan the pushed image (pulled from the registry, pinned to the first arch).
+    scan_image registry "${platforms%%,*}"
+
     if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         echo "Committing and pushing git repository..."
         git -C "$SCRIPT_DIR" add -A
@@ -162,9 +165,10 @@ case "${1:-build}" in
     build) build ;;
     arm64) PLATFORM=linux/arm64 build ;;
     push)  push  ;;
+    scan)  scan_image "${2:-local}" "${3:-$PLATFORM}" ;;
     run)   shift; run_image "$@" ;;
     *)
-        echo "Usage: $0 [build|arm64|push|run [args...]]" >&2
+        echo "Usage: $0 [build|arm64|push|scan|run [args...]]" >&2
         exit 1
         ;;
 esac
