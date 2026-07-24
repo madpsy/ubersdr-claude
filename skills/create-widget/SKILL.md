@@ -2091,9 +2091,48 @@ Remember the caveat above: while a widget is public, **every** `update` is
 immediately live to everyone who has it enabled. Iterate privately, publish when
 ready.
 
-To roll back a bad change, inspect `/admin/widgets/versions?widget_id=$WID`,
-fetch an old version's `html_content` from `/admin/widgets/version?...`, and
-`update` with it.
+### Roll back to a previous version
+
+There is no dedicated rollback endpoint. **Rolling back is just an `update`
+carrying an older version's `html_content`** — that content becomes a new version
+on top of the history (the bad version is never deleted, so you can always go
+forward again). Because `update` overwrites the **full** field set together
+(`name`, `description`, `html_content`, `is_public`), a rollback must re-send the
+old HTML **plus the widget's current metadata** — send only `html_content` and
+you'll blank the name, description, and visibility.
+
+> **Always confirm with the user before rolling back.** A rollback replaces the
+> current live widget with older code. Name the widget and the target version and
+> ask explicitly — *"Roll back 'Callsign Lookup' to version 3 (2026-07-20)? This
+> replaces the current version. — yes/no"* — and only push after a clear yes. If
+> the widget is **public**, apply the same public-widget warning as an edit: the
+> rollback goes live to every instance that has it enabled, immediately.
+
+```bash
+# Assumes PW / BASE / hdr / WID / META resolved as in the edit recipe above,
+# and ROLLBACK_VER set to the version number the user chose to restore.
+
+# 1. fetch the target version's HTML to a local file
+curl -s "${hdr[@]}" "$BASE/admin/widgets/version?widget_id=$WID&version=$ROLLBACK_VER" \
+  | jq -r '.html_content' > widgets-custom/rollback.widget.html
+
+# 2. CONFIRM WITH THE USER FIRST (and run the public-widget check from the edit
+#    recipe if META's is_public is true). Only continue after an explicit yes.
+
+# 3. push the old HTML back, preserving the CURRENT name/description/is_public
+jq -n --arg id "$WID" \
+      --arg name "$(jq -r .name <<<"$META")" \
+      --arg desc "$(jq -r '.description // ""' <<<"$META")" \
+      --argjson pub "$(jq -r '.is_public // false' <<<"$META")" \
+      --rawfile html widgets-custom/rollback.widget.html \
+   '{widget_id:$id, name:$name, description:$desc, html_content:$html, is_public:$pub}' \
+| curl -s -X POST "$BASE/admin/widgets/update" \
+    "${hdr[@]}" -H 'Content-Type: application/json' --data-binary @-
+```
+
+Tip: pair this with the compare recipe below — showing the user a summary of what
+the rollback would change (target version vs. current) is a good way to confirm
+they're restoring the version they actually mean before you push.
 
 ### Comparing two versions of a widget
 
