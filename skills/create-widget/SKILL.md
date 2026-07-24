@@ -2134,9 +2134,13 @@ Guidance for the assistant:
   the user expects (`+` = added in the newer version).
 - **Only one version exists?** `.versions[1]` is `null` — tell the user there's
   nothing to compare against yet rather than diffing against an empty file.
-- **Summarise, don't just dump.** A raw unified diff is fine for small changes,
-  but for anything large, describe what changed (behaviour, styling, fixed bugs)
-  in prose and show only the salient hunks.
+- **Always summarise what changed — this is the deliverable.** Whenever the user
+  asks to compare versions, lead with a plain-language summary of what actually
+  changed between them (behaviour, styling, fixed bugs, added/removed features),
+  not just the raw diff. Never answer a comparison request with a bare `diff`
+  dump: read the diff yourself and explain it. For small changes, the summary
+  plus the relevant hunks is fine; for large ones, describe the changes in prose
+  and show only the salient hunks.
 - Works for **any** `widget_id`, not just your own — you can diff two versions of
   a community or cloned widget the same way.
 
