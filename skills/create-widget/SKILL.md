@@ -183,6 +183,8 @@ A widget file has exactly three sections in this order:
      One-paragraph description of what the widget does.
      List any host services or globals it requires.
      Drag to reposition; position saved in localStorage.
+
+     Built with assistance from Claude Code.
 -->
 
 <style>
@@ -203,8 +205,15 @@ A widget file has exactly three sections in this order:
 </script>
 ```
 
-The opening comment block is mandatory — the collector displays it as the widget
-description.
+**The opening comment block is mandatory** — every widget MUST begin with an
+inline description comment at the very top of the widget code (the collector
+displays it as the widget's description). It must contain, at minimum:
+- the **widget name** and a **one-paragraph description** of what it does, plus
+  any host services/globals it relies on; and
+- an attribution line stating it was **"Built with assistance from Claude Code."**
+
+Never omit either. A widget submitted without this top-of-file description
+comment (including the Claude Code attribution) is incomplete.
 
 ---
 
