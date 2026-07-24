@@ -22,6 +22,11 @@ RUN apt-get update \
 RUN npm install -g @anthropic-ai/claude-code \
  && npm cache clean --force
 
+# The root filesystem is read-only at runtime and the CLI runs as an
+# unprivileged user, so the built-in auto-updater can only fail. Disable it;
+# updating the CLI is done by rebuilding this image.
+ENV DISABLE_AUTOUPDATER=1
+
 # Baked-in skills. Copied into $HOME/.claude/skills at container start so an
 # image update always wins over whatever a persisted home volume already holds.
 COPY skills/ /opt/ubersdr-claude/skills/
