@@ -616,6 +616,106 @@ collapseEl.addEventListener('click', function (e) {
 
 ---
 
+## Persisting other widget settings (localStorage)
+
+Position and collapsed state have their own dedicated patterns above. **Any
+*other* user-facing preference a widget exposes — a display mode (analogue vs
+digital), a selected filter, a chosen continent/country, a resized width/height,
+a "best score" — must also survive a reload**, persisted to `localStorage` and
+restored on load. Don't leave a setting that silently resets every page open.
+
+The convention across the bundled widgets is **one `localStorage` key per
+setting** (not a single bundled prefs object), each access wrapped in
+`try/catch`, exactly like the position and collapse blocks. Follow it.
+
+### Naming & collision
+
+Give each setting its own `LS_*_KEY` constant of the form
+**`<ns>_widget_<setting>`**, where `<ns>` is the widget's short CSS namespace —
+so it can't collide with another widget or with the reserved `_pos` /
+`_collapsed` keys (see the *localStorage key collision check* table). Real
+examples from `widgets/`:
+
+| Key | Widget | Holds |
+|---|---|---|
+| `wclk_widget_mode` | `world_clocks` | `'analogue'` / `'digital'` (string) |
+| `va_widget_continent` | `voice` | selected continent (string) |
+| `sdr-marker-widget-type-filter` | `marker` | active type filter (string) |
+| `dxc_widget_size` | `dxcluster` | `{width, outputHeight}` (JSON) |
+
+### String setting — store the value directly
+
+For a simple scalar (a mode, a selected option) store the string as-is. Restore
+in a small IIFE on load; write back in the change handler. This is
+`world_clocks`' display-mode code, generalised:
+
+```js
+var LS_MODE_KEY = 'myw_widget_mode';
+var digitalMode = false;                       // default
+
+(function restoreMode() {                      // apply on load
+  try { digitalMode = localStorage.getItem(LS_MODE_KEY) === 'digital'; }
+  catch (e) { /* ignore */ }
+})();
+
+function setMode(toDigital) {                   // save on change
+  digitalMode = !!toDigital;
+  widget.classList.toggle('myw-mode-digital', digitalMode);
+  try { localStorage.setItem(LS_MODE_KEY, digitalMode ? 'digital' : 'analogue'); }
+  catch (e) { /* ignore */ }
+}
+```
+
+A missing key returns `null`, so the `=== 'digital'` test just yields the
+default (`false`) — no separate default-handling needed.
+
+### Object / array setting — `JSON.stringify` / `JSON.parse`
+
+For anything structured (a size, a set of view flags, a list), stringify on save
+and parse on load, guarding the parse. This mirrors `dxcluster`'s saved size:
+
+```js
+var LS_SIZE_KEY = 'myw_widget_size';
+
+// save on change
+try {
+  localStorage.setItem(LS_SIZE_KEY, JSON.stringify({
+    width: widget.offsetWidth,
+    outputHeight: outputEl.offsetHeight
+  }));
+} catch (e) { /* ignore */ }
+
+// restore on load — guard the parse and sanity-check the shape
+(function restoreSize() {
+  try {
+    var saved = localStorage.getItem(LS_SIZE_KEY);
+    if (!saved) return;
+    var s = JSON.parse(saved);
+    if (s && typeof s.width === 'number') widget.style.width = s.width + 'px';
+    if (s && typeof s.outputHeight === 'number') outputEl.style.height = s.outputHeight + 'px';
+  } catch (e) { /* ignore */ }
+})();
+```
+
+**Rules of thumb**
+- **Apply on load, save on change.** Read each key once at startup and reflect it
+  in the DOM; write back inside the change handler. Don't poll.
+- **A missing key must yield the default**, never break — `getItem` returns
+  `null`, so test for the value you expect (string case) or `if (!saved) return`
+  (JSON case).
+- **Validate parsed values before use** (`typeof … === 'number'`, enum checks) —
+  stored data is user-editable via devtools and could be corrupt.
+- Keep the `try { … } catch (e) { /* ignore */ }` discipline on **every**
+  `getItem`/`setItem`: a `localStorage` failure (private mode, quota) must never
+  throw out of the widget's setup.
+
+Worked references in `widgets/`: `world_clocks.widget.html` (string mode),
+`voice.widget.html` (`va_widget_continent`/`va_widget_country`),
+`marker.widget.html` (type filter), `dxcluster.widget.html` (`dxc_widget_size`),
+`audio.widget.html` (view state as JSON).
+
+---
+
 ## `window.instanceDescription` — the server description object
 
 `app.js` fetches `/api/description` once at page load and stores the result in
