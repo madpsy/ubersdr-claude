@@ -773,6 +773,25 @@ Worked references in `widgets/`: `world_clocks.widget.html` (string mode),
 > (async, always resolves). Fetching the endpoint again wastes a round-trip and
 > duplicates work already done by the host page.
 
+> ℹ️ **You (Claude, in the container) *may* fetch it — that rule is for widget
+> runtime code, not for you.** The ⚠️ above is about a *widget's* JS at runtime.
+> It does **not** stop you, while building or reasoning about a widget, from
+> querying the endpoint yourself to learn about the live instance:
+>
+> ```bash
+> curl -s "$BASE/api/description" | jq '.'          # this instance's full live state
+> curl -s "$BASE/api/description" | jq '.addons, .enabled_widgets, .receiver'
+> ```
+>
+> It returns this instance's real state — enabled `addons`, `enabled_widgets`,
+> `receiver` (callsign / location / grid), and every feature flag in the table
+> below. Use it to **answer the user's questions about their instance** ("what's
+> enabled here?", "what's my grid?") and to **tailor a widget to what's actually
+> enabled** (e.g. only wire up SSTV if `"sstv"` is in `addons`; skip lookup UI if
+> `lookup_service` is `false`). It's a **public, unauthenticated** endpoint on the
+> same `$BASE` — send **no** `X-Admin-Password` (see *Verifying a public API's
+> response shape from the container*).
+
 ### Two access patterns
 
 **Pattern A — async/await** (simplest; use when the widget can wait):
@@ -843,6 +862,7 @@ All fields come from the server's `/api/description` response. Fields marked
 | `cw_skimmer` | `boolean` | Whether CW skimmer is enabled |
 | `cw_skimmer_rbn_spots` | `boolean` | Whether CW skimmer RBN spot forwarding is enabled |
 | `cw_skimmer_callsign` | `string` | CW skimmer operator callsign |
+| `cw_skimmer_callsign_lookup` | `boolean` | Whether the skimmer resolves spotted callsigns via the lookup service |
 | `chat_enabled` | `boolean` | Whether the chat/DX cluster is enabled |
 | `chat_users` | `number` | Current number of chat users |
 | `speech_to_text` | `boolean` | Whether Whisper speech-to-text is enabled |
@@ -862,6 +882,8 @@ All fields come from the server's `/api/description` response. Fields marked
 | `receiver.asl` | `number` | Altitude above sea level (metres) |
 | `receiver.snr_0_30_mhz` | `number` | Wideband SNR 0–30 MHz (dB, -1 = unavailable) |
 | `receiver.snr_1_8_30_mhz` | `number` | HF SNR 1.8–30 MHz (dB, -1 = unavailable) |
+| `receiver.timezone` | `string` | Station IANA timezone e.g. `"Europe/London"` |
+| `receiver.timezone_offset` | `number` | Station UTC offset in **minutes** e.g. `60` |
 | `receiver.gps.lat` | `number` | Latitude (decimal degrees) |
 | `receiver.gps.lon` | `number` | Longitude (decimal degrees) |
 | `receiver.gps.maidenhead` | `string` | Maidenhead grid locator e.g. `"IO91wm"` |
@@ -886,10 +908,20 @@ All fields come from the server's `/api/description` response. Fields marked
 | `frequency_reference.detected_frequency` | `number` | Detected frequency *(optional)* |
 | `frequency_reference.signal_strength` | `number` | Signal strength *(optional)* |
 | `frequency_reference.snr` | `number` | SNR of reference signal *(optional)* |
+| `frequency_reference.noise_floor` | `number` | Noise floor near the reference signal in dB *(optional)* |
 
 **`ant_switch` object** *(optional — omitted when disabled)*:
-Present when antenna switching is enabled; contains `enabled`, selected port
-numbers, and active port labels. Check `desc.ant_switch` for existence.
+Present when antenna switching is enabled. Fields: `enabled` (bool), `selected`
+(array of active port numbers, e.g. `[1]`), `active_labels` (array of the
+selected ports' labels, e.g. `["Long Wire"]`), and `grounded` (bool — whether the
+antenna is currently grounded). Check `desc.ant_switch` for existence.
+
+**`frontend` object** *(optional)* — RF front-end power telemetry:
+
+| Field | Type | Description |
+|---|---|---|
+| `frontend.if_power` | `number` | IF power in dB |
+| `frontend.input_power_dbm` | `number` | Antenna input power in dBm |
 
 **`dsp` object** *(optional)*:
 
@@ -897,10 +929,14 @@ numbers, and active port labels. Check `desc.ant_switch` for existence.
 |---|---|---|
 | `dsp.enabled` | `boolean` | Whether server-side DSP/NR is available |
 | `dsp.filters` | `string[]` | Available DSP filter names *(only when enabled)* |
+| `dsp.max_users` | `number` | Max concurrent users of the server-side DSP |
 
 **`gpsdo` object** *(optional — omitted when device absent or unhealthy)*:
 Present when a Leo Bodnar LBE-1420 GPSDO is connected and fully operational.
-Check `if (desc.gpsdo)` for presence.
+Check `if (desc.gpsdo)` for presence. Fields include `enabled`, `gps_lock` /
+`pll_lock` (bool), `fix` / `fix_mode` (e.g. `"GPS"` / `"3D"`), `mode` (e.g.
+`"PLL"`), `frequency_hz`, `sats_used`, `gps_in_view` / `glo_in_view`,
+`hdop` / `pdop` / `vdop`, `antenna_ok`, `output1_enabled`, and `utc` (RFC3339).
 
 **`pskreporter_rank` object** *(optional)*:
 Present when digital decoding + PSKReporter are enabled and rank data is
@@ -1775,8 +1811,11 @@ These are orthogonal — don't conflate them:
   (that's what powers versioning); public only controls **discoverability by
   others**.
 
-So the normal "just for me" flow is: **create (private) → enable**. Making it
-public is an extra, optional step for sharing with the community.
+So the normal "just for me" flow is: **create (private) → enable**, and you do
+**both automatically** when the user asks for a widget — a freshly created widget
+should be left live on their page, not sitting created-but-disabled (see *Create
+a new widget* for the auto-enable step and its exceptions). Making it public is a
+separate, optional step for sharing with the community.
 
 > ⚠️ **Editing a public widget is a community-visible action.** Once a widget is
 > public, every `update` you push becomes a new version that is **live to the
@@ -1807,6 +1846,40 @@ WID="$(jq -n --rawfile html widgets-custom/my_thing.widget.html \
       | jq -r .widget_id)"
 echo "Created $WID"
 ```
+
+**Then enable it automatically — creating a widget should leave it live.** A
+freshly created widget is owned but **not yet rendering** on the SDR page (create
+and enable are separate operations). Unless the user said otherwise, immediately
+enable the new `$WID` as part of the create flow so they don't have to ask —
+using the read-modify-write union from *Enable it on this instance* below (which
+handles the 10-widget cap):
+
+```bash
+# Auto-enable the widget just created (append to the current enabled union).
+ENABLED=$(curl -s "$BASE/admin/widgets/enabled" -H "X-Admin-Password: $PW")
+MAX=$(jq -r .max_allowed <<<"$ENABLED")
+NEW=$(jq -c --arg id "$WID" '[.enabled[].widget_id] + [$id] | unique' <<<"$ENABLED")
+if [ "$(jq length <<<"$NEW")" -gt "$MAX" ]; then
+  echo "Widget created but NOT enabled — you're at the $MAX-widget cap. Currently enabled:"
+  jq -r '.enabled[] | "  - \(.name) (\(.widget_id))"' <<<"$ENABLED"
+  echo "Tell me which one to disable and I'll swap it in."
+else
+  curl -s -X POST "$BASE/admin/widgets/enabled" \
+       -H "X-Admin-Password: $PW" -H 'Content-Type: application/json' \
+       -d "{\"enabled\": $NEW}" >/dev/null
+  echo "Enabled $WID — reload the SDR page to see it."
+fi
+```
+
+Two cases where you **don't** silently auto-enable:
+- **At the `max_allowed` cap** — creation still succeeds, but say the widget was
+  created and left disabled because they're at the cap, list what's enabled, and
+  ask which to disable (don't drop one yourself). See *Enable it on this instance*.
+- **The user asked to just create/draft it** (e.g. "make it but don't turn it on
+  yet", or they're iterating privately) — respect that and skip the enable.
+
+Tell the user the outcome either way: created **and enabled** (reload to see it),
+or created but left disabled and why.
 
 ### Edit an existing widget ("edit my widget xyz")
 
