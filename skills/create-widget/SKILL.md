@@ -2095,6 +2095,51 @@ To roll back a bad change, inspect `/admin/widgets/versions?widget_id=$WID`,
 fetch an old version's `html_content` from `/admin/widgets/version?...`, and
 `update` with it.
 
+### Comparing two versions of a widget
+
+When the user asks *"what changed between versions?"*, *"diff my &lt;X&gt;
+widget"*, or *"compare the last two versions"*, there is no comparison endpoint —
+the collector only stores each version's full `html_content`. **Fetch both
+versions' HTML into separate files and `diff` them locally.** The `versions`
+list is newest-first (`.versions[0]` is the latest), and each entry carries the
+`version` value plus metadata (e.g. `created_at`) you can show the user.
+
+```bash
+# Resolve name → widget_id first (see the fuzzy-match rules), then:
+
+# List versions, newest-first — pick the two to compare
+curl -s "${hdr[@]}" "$BASE/admin/widgets/versions?widget_id=$WID" \
+  | jq -r '.versions[] | "\(.version)\t\(.created_at // "")"'
+
+# Default "compare the last two": latest (VNEW) vs the one before it (VOLD)
+VNEW=$(curl -s "${hdr[@]}" "$BASE/admin/widgets/versions?widget_id=$WID" | jq -r '.versions[0].version')
+VOLD=$(curl -s "${hdr[@]}" "$BASE/admin/widgets/versions?widget_id=$WID" | jq -r '.versions[1].version')
+
+# Fetch each version's html_content to its own file
+curl -s "${hdr[@]}" "$BASE/admin/widgets/version?widget_id=$WID&version=$VOLD" \
+  | jq -r '.html_content' > "/tmp/widget_${WID}_${VOLD}.html"
+curl -s "${hdr[@]}" "$BASE/admin/widgets/version?widget_id=$WID&version=$VNEW" \
+  | jq -r '.html_content' > "/tmp/widget_${WID}_${VNEW}.html"
+
+# Diff old → new (use your scratch dir, not /tmp, if you have one)
+diff -u "/tmp/widget_${WID}_${VOLD}.html" "/tmp/widget_${WID}_${VNEW}.html"
+```
+
+Guidance for the assistant:
+- **Confirm which two versions.** If the user didn't say, default to the latest
+  vs. the immediately preceding version and state which numbers you compared.
+  For an arbitrary pair, substitute their chosen `version` values for `$VOLD` /
+  `$VNEW`.
+- **Direction matters:** diff **old → new** so additions/removals read the way
+  the user expects (`+` = added in the newer version).
+- **Only one version exists?** `.versions[1]` is `null` — tell the user there's
+  nothing to compare against yet rather than diffing against an empty file.
+- **Summarise, don't just dump.** A raw unified diff is fine for small changes,
+  but for anything large, describe what changed (behaviour, styling, fixed bugs)
+  in prose and show only the salient hunks.
+- Works for **any** `widget_id`, not just your own — you can diff two versions of
+  a community or cloned widget the same way.
+
 ### Delete a widget — confirm first, and mind public widgets
 
 Deletion is **destructive and not a versioned change** — `POST
