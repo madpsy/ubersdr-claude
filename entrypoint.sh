@@ -19,7 +19,7 @@ export BASE="${BASE:-http://ubersdr:8080}"
 PERM_MODE="${WIDGET_AI_PERMISSION_MODE:-bypassPermissions}"
 
 # Seed prompt when the session starts with no explicit prompt/args.
-INIT_PROMPT="${WIDGET_AI_PROMPT:-Ensure the UberSDR widgets skill is loaded, then list some of the available community widgets (name + short description) I could enable or clone.}"
+INIT_PROMPT="${WIDGET_AI_PROMPT:-Ensure the UberSDR widgets skill is loaded, then: (1) list some of the available community widgets (name + short description) I could enable or clone; and (2) give me three example prompts I could use to build a new widget.}"
 
 say() { printf '\033[36m▸ %s\033[0m\n' "$*"; }
 
