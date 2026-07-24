@@ -119,6 +119,23 @@ Widgets run in the **same browsing context** as the main SDR page — they share
 `window`, the DOM, and all globals exposed by `app.js`. There is no iframe, no
 shadow DOM, no module boundary.
 
+**A widget does not have to be visible — or render any UI at all.** Because it
+runs in the host page's own context with full access to `window` and the DOM, a
+widget is really just *code that runs on the page*. Many widgets are floating
+panels, but a widget can equally:
+- **change an aspect of the page** — restyle or rearrange existing elements,
+  toggle host features, tweak the spectrum/waterfall, override a default;
+- be **purely behavioural** — add a keyboard shortcut, play audio, auto-tune on
+  an event, log or forward data — with **no persistent UI** of its own;
+- be a **fixed control** — a small anchored button, menu, or status badge rather
+  than a draggable panel.
+
+So don't assume every request needs a panel. Pick the form that fits what the
+user actually wants: a visible panel, an unobtrusive fixed control, or an
+invisible behavioural widget. The "four non-negotiables" below apply to the
+common floating-panel case — a widget with little or no UI applies only the ones
+that make sense (see the scoping note in that section).
+
 ---
 
 ## Example requests
