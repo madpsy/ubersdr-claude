@@ -2101,6 +2101,16 @@ forward again). Because `update` overwrites the **full** field set together
 old HTML **plus the widget's current metadata** — send only `html_content` and
 you'll blank the name, description, and visibility.
 
+> **Round-trip the HTML through a file on disk — never retype it from memory.**
+> The version you're restoring must go: `GET .../version` → **write the exact
+> `html_content` to a file** (e.g. `widgets-custom/rollback.widget.html`) →
+> `update` reads that **same file** back (`--rawfile`). Do **not** reconstruct,
+> paraphrase, or "remember" the old code and re-emit it — widget HTML is large and
+> any drift silently corrupts the rollback. The bytes you push must be the exact
+> bytes the API returned, so let the file carry them: fetch → save → read → push,
+> with no hand-editing of the content in between (a rollback restores code
+> verbatim; if you also want to change something, that's a separate edit).
+
 > **Always confirm with the user before rolling back.** A rollback replaces the
 > current live widget with older code. Name the widget and the target version and
 > ask explicitly — *"Roll back 'Callsign Lookup' to version 3 (2026-07-20)? This
