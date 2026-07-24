@@ -35,6 +35,20 @@ description: Create, list, or edit widgets for the UberSDR web SDR interface —
 > and a `<script>` block — these are injected verbatim into the host page, which
 > already provides the full document shell.
 
+> **A widget is real HTML, CSS, and JavaScript — build it to a high standard.**
+> A widget isn't a throwaway snippet: it's markup, styling, and script that run
+> live in the host page and share its `window` and DOM. So treat it as production
+> code. **Code quality and reliability come first** — clean, well-structured JS;
+> defensive guards around every host global and `localStorage` access
+> (`typeof`/existence checks, `try/catch`); no leaks (cancel timers/RAF/listeners
+> on close); no globals that could collide with the host or other widgets; and it
+> must fail gracefully when a service it depends on is absent. **User experience
+> and visual aesthetic are always important too** — every widget should feel
+> polished and considered: match the established glassmorphism look, keep the
+> layout tidy at every size, make interactions smooth and obvious, and respect
+> the user's preferences (persist them). "Works" is the floor; a widget should be
+> reliable, well-crafted, *and* a pleasure to use.
+
 > **Four things a standard floating-panel widget MUST have:**
 > 1. A **visible ✕ close button** in the header — users must always be able to dismiss a widget
 > 2. A **collapse/expand arrow** to the **left of the title** — collapses the widget to just its title bar; the collapsed/expanded state is persisted to `localStorage`
