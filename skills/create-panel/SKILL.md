@@ -66,6 +66,60 @@ access to page globals, and it is not an HTML document. Do not write
 
 ---
 
+## 1.1 Before you build anything, find out what is there
+
+**Do this once at the start of a session, before creating or editing.** It takes
+one call and it changes what you should do next.
+
+`mine` is **everything this operator has ever created** — enabled or not, public
+or private, panel or classic widget. That is the list that matters: a panel they
+made last week and never enabled still owns its name, still exists to be edited,
+and is still very probably the thing they are now asking you to change. The
+enabled list is a separate, smaller question asked underneath.
+
+```bash
+BASE="${BASE:-http://ubersdr:8080}"
+
+curl -s "$BASE/admin/widgets/mine?ui=any" \
+  | jq -r '.widgets[] | "\(.widget_id)  \(if .ui_version == 2 then "panel " else "classic" end)  v\(.version)  \(.name)"'
+
+curl -s "$BASE/admin/widgets/enabled" | jq -r '"enabled: \(.count)/\(.max_allowed)"'
+
+# And what the community already publishes — panels they could enable instead of
+# you building one, and names already spoken for out there.
+curl -s "$BASE/admin/widgets/public-with-instances?ui=any" \
+  | jq -r '.widgets[] | select(.ui_version == 2) | "\(.callsign)  \(.name)"'
+```
+
+What it tells you, and why each matters:
+
+- **Whether the thing being asked for already exists.** If the user says "make me
+  an SNR meter" and they already have one, they almost certainly want *that one*
+  changed — say so and offer to edit it, rather than creating a second. This is
+  the single most common way an assistant does the wrong thing here: the request
+  sounds like creation, and the right answer is an edit.
+- **Which names are taken.** A duplicate name leaves two rows the operator cannot
+  tell apart, and the instance refuses it at create time anyway (§15) — better to
+  know before you have written the panel than after.
+- **Whether there is room.** The enabled list is capped, and it is the *only*
+  thing the cap applies to — owning panels is unlimited, showing them is not. If
+  they are at the cap, a new panel will be created but left disabled, and they
+  need to be told that *before* you start rather than at the end.
+- **Which of their records are still classic widgets.** Those do not appear in the
+  current interface at all, and an operator with several may not realise it.
+- **What the community already publishes.** Two things come out of this. Somebody
+  may have written the panel already, which is worth saying — *"K1ABC publishes an
+  SNR meter; shall I enable that instead of writing one?"* is often the better
+  answer than building. And their names are effectively taken too: a community
+  panel the operator enables sits in the same layout manager as yours, so a
+  duplicate is just as confusing even though nothing refuses it.
+
+Cheap enough to be worth doing unprompted, and the result is worth restating to
+the user in a line — *"you already have four panels, three enabled, and one of
+them is an SNR meter"* — before you ask what they want built.
+
+---
+
 ## 2. The bundle
 
 One HTML file, three required pieces: a `<template>` wrapper, a manifest, and
@@ -156,6 +210,58 @@ may still be silently using fallbacks. Get the names right.
 
 ---
 
+## 3.1 Names and clashes
+
+Two different things, and only one of them matters.
+
+**Ids cannot collide.** A panel's registry id is `x:` plus the collector's own
+UUID, so it can never be the same as another panel's or as a built-in's
+(`receiver`, `layout`, `signal`). A manifest cannot choose it and cannot claim
+one. This is the part that would actually break something — the registry is a
+map, and a duplicate would shadow the real panel — so it is prevented
+structurally rather than by convention.
+
+**Titles can collide, and nothing stops them.** Call your panel "Signal" and
+there will be two rows called Signal in the layout manager, two identical tabs on
+a phone, and two identical dock headers. Nothing breaks; the operator just cannot
+tell them apart. The admin editor warns when a title matches a built-in, but a
+clash with another *custom* panel it cannot see coming.
+
+So: **pick a title that is yours.** These are the names the interface already
+uses — do not reuse one:
+
+```
+Addons · Announcements · Antenna switch · Audio · Audio filters
+Audio scope · Backup · Band plan · Bands · Band Spectrum · Bookmarks
+Callsign lookup · Chat · Display · Doppler · DX cluster · Events
+Extensions · HFDL · IF Spectrum · Layout · Lightning · Listeners
+Local bookmarks · Markers · Media controls · Mini Games · Most used
+Multipad · NAVTEX · News · Noise reduction · Notifications · Packet
+Quick bands · Radio control · Ranking · Receiver · Receiver info
+Recorder · Rotator · SDR control · Shortcuts · Signal · Space weather
+Spectrogram · Spots · SSTV · Voice activity · Voice skimmer · Weather
+Weather fax · World clocks
+```
+
+That list is the copy baked into this skill; the instance's own is in
+`reference/panel-meta.json` under `titles`, and wins if they differ.
+
+**Also check what the operator already has**, which no list here can know:
+
+```bash
+curl -s "$BASE/admin/widgets/mine?ui=any" | jq -r '.widgets[].name'
+```
+
+If your panel does much the same job as an existing one, say what is different
+about it — "Spots (CW only)" — rather than reusing the name.
+
+Nothing else clashes. Unlike the classic interface, where every widget shared one
+page, a panel is its own document: your CSS, your element ids, your variables and
+your stored keys are yours alone and cannot touch another panel's or the
+receiver's.
+
+---
+
 ## 4. Icon names
 
 `icon` names one of the interface's own glyphs so the panel looks like the ones
@@ -231,10 +337,20 @@ const now = await sdr.get('signal');   // one-off read, no subscription
 sdr.state('tuning');                   // last value of a subscribed topic, synchronously
 ```
 
-`state()` is for a redraw that needs the current reading and should not wait a
-round trip for something it has already been told. It is `null` before the first
-value arrives — `subscribe()` resolves with the opening snapshot, so it is
-populated from then on.
+**`on` is given the current value, not only later changes.** Underneath, the page
+API is a *patch* protocol — subscribing answers with a snapshot and everything
+after is a diff — so a topic that does not change produces no further message at
+all. A handler that drew only from its own callback would never draw on a
+receiver that was already tuned and running, and the panel would sit on its own
+"Loading…" for ever. The panel runtime seeds your handler with the opening value,
+whether you register it before or after `subscribe`.
+
+`state()` is for a redraw that needs the current reading without waiting a round
+trip. It is `null` until the first value arrives.
+
+> This is the one place the panel runtime deliberately differs from the raw page
+> API an extension sees. `BRIDGE_API.md` describes the strict patch protocol; in
+> a panel, handlers are seeded for you.
 
 | Topic | Shape |
 |---|---|
@@ -778,7 +894,8 @@ first**, they are already on disk:
 reference/PANEL_AUTHORING.md   the author's guide, from this receiver
 reference/example-panel.html   a complete worked panel, verified against its parser
 reference/BRIDGE_API.md        topics, commands and functions in full
-reference/panel-meta.json      the icon and group names this build actually has
+reference/panel-meta.json      the icon names, group ids and built-in panel
+                               titles this build actually has
 ```
 
 If they are missing — the fetch is best-effort and the receiver may have been
@@ -935,6 +1052,66 @@ invent silent placeholders. Propose a short specific name and a one-line
 description drawn from what was asked, confirm in a sentence — *"I'll call it
 'Band Memories' — remembers frequencies and tunes back to them. OK?"* — then
 submit. Only stop to ask outright if the request is too vague to name.
+
+**Check the name is free first — actually run this**, do not go from the list
+baked into this skill, which is a copy and may be older than the receiver:
+
+```bash
+WANT="Band Memories"
+
+# Names the interface itself uses, from this receiver. `.titles // []` matters:
+# a receiver older than this field has no `titles` key, and `.titles[]` would
+# error and leave the file empty — which reads as "nothing is taken" and is
+# exactly the wrong answer.
+{ jq -r '.titles // [] | .[]' reference/panel-meta.json 2>/dev/null \
+    || curl -s "$BASE/v2/dist/panel-meta.json" | jq -r '.titles // [] | .[]'; } > taken.txt
+
+BUILTIN=$(wc -l < taken.txt)
+
+# …and the names this operator already has. These are the ones the instance will
+# actually refuse (§15).
+curl -s "$BASE/admin/widgets/mine?ui=any" | jq -r '.widgets[].name' >> taken.txt
+
+# …and what the community publishes. Nothing refuses these — they belong to
+# other operators — but a community panel this operator enables lands in the same
+# layout manager, so a clash is just as confusing. Warn, do not block.
+curl -s "$BASE/admin/widgets/public-with-instances?ui=any" \
+  | jq -r '.widgets[] | select(.ui_version == 2) | .name' > community.txt
+
+if [ "$BUILTIN" -eq 0 ]; then
+    echo "NOTE: this receiver does not publish its panel titles — check $WANT"
+    echo "      against the list in section 3.1 by hand."
+fi
+
+if grep -qixF "$WANT" taken.txt; then
+    echo "TAKEN — pick another name"
+elif grep -qixF "$WANT" community.txt; then
+    echo "a community panel is already called that — allowed, but say so"
+fi
+```
+
+**An empty list is not the same as a free name.** If the receiver returns no
+titles, fall back to the list in §3.1 rather than concluding the name is
+available — that is the case on any instance older than this field.
+
+**The instance refuses a duplicate anyway.** `create` answers `409 Conflict` with
+
+```json
+{"error":"you already have a widget called \"SNR meter\" (aaaa-…) — choose a different name, or update that one instead of creating a second"}
+```
+
+when the name matches one this operator already owns, compared ignoring case and
+surrounding space. Check first so the user is asked before the attempt rather
+than after it — but if you do see a 409, **do not retry with a suffix**. It
+almost always means the user wanted the existing panel *changed*: say which panel
+already has the name, and offer to edit it or to pick a different one.
+
+A clash breaks nothing — ids cannot collide — but it leaves two rows with the
+same name in the operator's layout manager and no way to tell which is which.
+
+The manifest `title` and the collector `name` should normally be the same thing;
+if they differ, the operator sees one in the layout manager and the other in the
+admin list, which is its own small confusion.
 
 ```bash
 BASE="${BASE:-http://ubersdr:8080}"

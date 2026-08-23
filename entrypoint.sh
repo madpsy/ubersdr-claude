@@ -19,7 +19,7 @@ export BASE="${BASE:-http://ubersdr:8080}"
 PERM_MODE="${WIDGET_AI_PERMISSION_MODE:-bypassPermissions}"
 
 # Seed prompt when the session starts with no explicit prompt/args.
-INIT_PROMPT="${WIDGET_AI_PROMPT:-Ensure the UberSDR panels skill is loaded, then: (1) list some of the available community panels (name + short description) I could enable or clone; and (2) give me three example prompts I could use to build a new panel. Finally, as the last thing, tell me that I can remotely control this Claude session itself (not the UberSDR instance) any time by running the /remote-control command.}"
+INIT_PROMPT="${WIDGET_AI_PROMPT:-Ensure the UberSDR panels skill is loaded, then: (1) list the panels and widgets I have already created on this instance, saying which are enabled and which are still classic widgets; (2) list some of the available community panels (name + short description) I could enable or clone; and (3) give me three example prompts I could use to build a new panel. Finally, as the last thing, tell me that I can remotely control this Claude session itself (not the UberSDR instance) any time by running the /remote-control command.}"
 
 say() { printf '\033[36m▸ %s\033[0m\n' "$*"; }
 
