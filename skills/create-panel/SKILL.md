@@ -368,6 +368,7 @@ trip. It is `null` until the first value arrives.
 | `audio` | `{ volume, muted, ducked, channel, bufferSec, squelch:{value,enabled,threshold,open} }` |
 | `signal` | `{ dbfs, noise, snr, s, level, clipping }` |
 | `spectrum` | `{ centerFreq, span, binBandwidth, binCount, follow }` |
+| `vfos` | `{ active, slots:[{id, active, frequency, mode, bandwidthLow, bandwidthHigh}] }` — all four |
 | `session` | `{ id, receiverId, running, maxSec, idleSec, startedAt }` |
 | `page` | `{ url, title }` |
 | `layout` | `{ panels:[{id,title,placement,hidden,unhideable}], docks:[…] }` |
@@ -407,6 +408,11 @@ await sdr.command('tune', { frequency: 14074000, mode: 'usb' });
 
 Two rules worth obeying:
 
+- **`vfos` is the only way to see a VFO that is not the active one.** `tuning`
+  reports the active VFO only. Switching to another to read it *really retunes
+  the receiver* — audible to everyone listening — so never do that to gather
+  values. Subscribe to `vfos` and read all four; the active slot comes from live
+  tuning, so it stays correct as the dial moves.
 - **`tune` carries mode and passband in one call.** Sending them separately walks
   the receiver through intermediate mode/passband pairs, which is audible.
 - **`spectrum` with `center` and `span` together** is one call for the same
