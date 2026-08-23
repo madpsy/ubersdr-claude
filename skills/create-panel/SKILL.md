@@ -99,7 +99,7 @@ What it tells you, and why each matters:
   the single most common way an assistant does the wrong thing here: the request
   sounds like creation, and the right answer is an edit.
 - **Which names are taken.** A duplicate name leaves two rows the operator cannot
-  tell apart, and the instance refuses it at create time anyway (§15) — better to
+  tell apart, and the instance refuses it at create time anyway (§16) — better to
   know before you have written the panel than after.
 - **Whether there is room.** The enabled list is capped, and it is the *only*
   thing the cap applies to — owning panels is unlimited, showing them is not. If
@@ -119,14 +119,14 @@ the user in a line — *"you already have four panels, three enabled, and one of
 them is an SNR meter"* — before you ask what they want built.
 
 **Then read the built-in panel closest to what you are about to build.** They are
-on disk at `reference/src/panels/` (see §14) — sixty of them, already cloned, no
+on disk at `reference/src/panels/` (see §15) — sixty of them, already cloned, no
 fetching required. This is not optional polish: it is the difference between a
 panel that looks like it belongs in the dock and one that looks like a debug
 readout, and it is where the wording, the formatting and the layout conventions
 actually live. A readout? Read `SignalPanel.jsx`. A list? `SpotsPanel.jsx`.
 Something remembered per user? `ClocksPanel.jsx`.
 
-Read them for *conventions*, never for structure — see the warning in §14.
+Read them for *conventions*, never for structure — see the warning in §15.
 
 ---
 
@@ -198,7 +198,7 @@ external `<script src>`, no external stylesheet, no `<base href>`, no
 | `dock` | no | `left`, `right`, `bottom`. Default `left`. |
 | `defaultOpen` | no | `false` ships it collapsed. Default `true`. |
 | `defaultHidden` | no | `true` ships it hidden but listed. Default `false`. |
-| `minimal` | no | `true` if you honour `sdr.minimal` (§8). Default `false`. |
+| `minimal` | **yes** | Always `true`. Every panel owes the operator a minimal view — see §8. |
 | `fill` | no | `true` to stretch to the dock height. Bottom dock only. |
 | `weight` | no | Share of the bottom dock's width, 0.1–4. Default `1`. |
 | `height` | no | Starting height in px, 60–2000, before the panel reports its own. |
@@ -607,9 +607,59 @@ The frame already supplies a small base stylesheet — sensible defaults for
 buttons, inputs, tables and code, in the operator's colours. Style what is
 particular to your panel, not the basics.
 
-**The minimal view** is the operator saying "keep this, but smaller". If you
-declare `"minimal": true`, honour `sdr.minimal`: drop what is set-and-forget,
-keep what is watched. You decide what survives; nothing does it for you.
+### The minimal view is not optional
+
+**Every panel declares `"minimal": true` and honours `sdr.minimal`.** Not "if you
+have time" and not "if the panel is big enough" — a panel with no minimal view is
+an unfinished panel, and the operator finds out by pressing a button that does
+nothing.
+
+The reason is the screen, not tidiness. An operator runs six panels in a 220 px
+dock, or on a phone where a panel is a sheet over the spectrum. The minimal view
+is how your panel earns a place in that arrangement instead of being the one they
+close. A panel that can only be full size is a panel that is usually shut.
+
+**What survives is the answer to one question: what is this panel *for*?** Keep
+what is watched or acted on; drop what is set once and then ignored.
+
+| Drop | Keep |
+|---|---|
+| Settings, filters, thresholds, preferences | The reading, the list, the control the panel exists for |
+| Headings, legends, helper text, explanations | Units and labels *only* where the number is meaningless without them |
+| Secondary columns, timestamps, provenance | The one or two columns somebody actually scans |
+| Empty-state prose | A short `—` or one line |
+
+Two rules that make the difference between a minimal view and a broken one:
+
+- **It is a smaller view of the same panel, not a different panel.** Nothing
+  appears in minimal that is absent from full. The operator is choosing less, not
+  something else.
+- **Nothing becomes unreachable.** If the only way to act is a control you drop,
+  keep the control and drop its label. A minimal view that cannot be used is a
+  panel that has to be expanded to do anything, which is the state the operator
+  was trying to leave.
+
+```js
+const sdr = await ubersdr.ready();
+
+// Read once, at startup, and that is the whole of it: toggling the minimal view
+// rebuilds the frame, so the panel starts again with the new answer. There is no
+// event, and listening for one is not what is missing — see §7.
+if (sdr.minimal) document.body.classList.add('min');
+```
+
+```css
+/* Style the difference; do not rebuild the panel in JavaScript. */
+.min .settings,
+.min .legend,
+.min .col-secondary { display: none; }
+.min .reading { font-size: 1.1em; }
+```
+
+Decide it in CSS off one class, rather than building two layouts in JavaScript.
+The panel is rendered once either way, and a stylesheet makes "what survives"
+something you can read at a glance instead of something spread through the code
+that draws it.
 
 ---
 
@@ -707,7 +757,155 @@ ship into by default.
 
 ---
 
-## 10. Composition — making a panel look designed
+## 10. Input — every panel is used with a finger
+
+Half the operators are on a phone or a tablet. A panel built with a mouse in mind
+is not "slightly worse" there; the part you built it for is unreachable. There is
+no hover, no right button and no wheel, and none of them degrade gracefully — they
+simply do not happen.
+
+The rule is one line: **every interaction needs a touch answer, and it is your
+job to provide it.**
+
+| Mouse | Touch equivalent you must provide |
+|---|---|
+| Click | Tap — free, *if* the target is big enough and you listen for `click`, not `mousedown` |
+| Right-click / context menu | **Long press**, timed yourself — see below |
+| Wheel to zoom | **Pinch** with two pointers |
+| Wheel to scroll | Native scrolling on an overflow container — do not reimplement it |
+| Hover to reveal | Nothing. It never fires. Show it, or put it behind a tap |
+| Double-click | Double-tap works, but prefer a single tap or a button |
+| Drag | Same gesture, but see `touch-action` below or the browser steals it |
+
+### Pointer events, not mouse events
+
+Write `pointerdown` / `pointermove` / `pointerup`. One code path covers mouse,
+finger and pen, and `e.pointerType` tells you which you got when you need to care
+— as the long press below does. Mouse-only events (`mousedown`, `mouseenter`) are
+how a panel ends up working on your desk and nowhere else.
+
+`click` itself is fine and fires on tap. The trap is the *other* handlers.
+
+### Hover reveals nothing on a touchscreen
+
+A control that only appears on `:hover`, a tooltip that is the only place a unit
+or a full value is written, a row action that fades in — none of it exists on a
+phone. Hover is decoration for a mouse, never the only route to something.
+
+### Right-click means long press, and you must time it yourself
+
+Do not rely on the `contextmenu` event. **Android's WebView fires it on a long
+press; iOS's does not — WebKit has no such event on a touchscreen and answers the
+hold with its own text callout instead.** The same gesture reaches your panel on
+one phone and not the other, with nothing on screen to explain why. The receiver's
+own spectrum hit this exactly, and times the hold by hand for this reason.
+
+The app's numbers, so one hold feels like another: **400 ms**, cancelled if the
+finger moves more than **10 px**.
+
+```js
+const HOLD_MS = 400, HOLD_SLOP = 10;
+let hold = null;
+
+el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;        // a mouse has a right button
+    hold = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {
+        hold = null;
+        openMenu(e.clientX, e.clientY);           // must be safe to call twice
+    }, HOLD_MS) };
+});
+el.addEventListener('pointermove', (e) => {
+    if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_SLOP) cancelHold();
+});
+el.addEventListener('pointerup', cancelHold);
+el.addEventListener('pointercancel', cancelHold);
+
+// Keep the mouse path too — and make the action idempotent, because on Android
+// both this and the timer above can arrive for one gesture.
+el.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu(e.clientX, e.clientY); });
+```
+
+Add `user-select: none` and `-webkit-touch-callout: none` to anything long-pressed,
+or iOS selects text and shows its own menu over yours.
+
+### Wheel means pinch
+
+A touchscreen has no wheel. If the wheel zooms — a map, a chart, an image — then
+two fingers must zoom too, or the feature is desktop-only. Track *every* live
+pointer: one is a drag, two is a pinch.
+
+```js
+const pointers = new Map();
+let pinch = null;
+
+const gesture = () => {
+    const [a, b] = [...pointers.values()];
+    if (!a || !b) return null;
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y),
+             x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+};
+
+el.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    el.setPointerCapture(e.pointerId);
+    if (pointers.size >= 2) { drag = null; pinch = gesture(); }   // the drag is over
+    else drag = { x: e.clientX, y: e.clientY };
+});
+el.addEventListener('pointermove', (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch) {
+        const now = gesture();
+        if (now) zoomBy(now.dist / pinch.dist, now.x, now.y);      // about the midpoint
+        pinch = now;
+        return;
+    }
+    if (drag) panBy(e.clientX - drag.x, e.clientY - drag.y), drag = { x: e.clientX, y: e.clientY };
+});
+const release = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; };
+el.addEventListener('pointerup', release);
+el.addEventListener('pointercancel', release);
+```
+
+Two mistakes that look like bugs in your maths:
+
+- **Holding one `drag` origin.** A second finger overwrites it and the view jumps.
+  Keep the map of pointers; end the drag the moment the second one lands.
+- **Forgetting `pointercancel`.** The browser takes the gesture away — a scroll
+  wins, a call arrives — and a pointer that is never deleted leaves the panel
+  believing a finger is still down.
+
+If you use a mapping library (Leaflet and its like), pinch, drag and double-tap
+are already handled; do not add your own on top. What still needs deciding is
+whether the **wheel** zooms, because a map inside a scrolling column that eats
+the wheel traps the page — the receiver's own map takes that as a flag and
+leaves the wheel to the page.
+
+### `touch-action`, or the browser takes the gesture
+
+The browser assumes a drag is a scroll and claims it, usually mid-gesture, so it
+half works. Say what you want:
+
+```css
+.dragsurface  { touch-action: none;  }  /* a canvas, a slider, a map: all of it is mine */
+.scrollstrip  { touch-action: pan-y; }  /* vertical scrolling survives; horizontal drag is mine */
+```
+
+Only on the element that owns the gesture. `touch-action: none` on a container
+kills scrolling for everything inside it.
+
+### Targets big enough to hit
+
+**44 px minimum** for anything tapped, and remember §9's widths: a dock can be
+220 px. Four icon buttons in a row at 44 px do not fit — so a panel with a lot of
+controls needs fewer of them, not smaller ones. Padding counts toward the target,
+so a small glyph in a `44px` box is fine.
+
+Space them, too. Two destructive controls side by side at the minimum size is a
+mis-tap waiting to happen.
+
+---
+
+## 11. Composition — making a panel look designed
 
 A panel that is merely *correct* still looks amateur if everything is jammed into
 the top-left corner at body size. The interface has a strong house look and you
@@ -807,7 +1005,7 @@ centre it, size it, colour the number, and give it room.
 
 ---
 
-## 11. House conventions — how the built-in panels do it
+## 12. House conventions — how the built-in panels do it
 
 Match these and the panel reads as part of the interface rather than as a guest.
 They are drawn from what the interface's own panels and formatters actually do.
@@ -893,7 +1091,7 @@ word or a shape, for the operator who cannot distinguish them.
 
 ---
 
-## 12. Escaping — always, for anything you did not write
+## 13. Escaping — always, for anything you did not write
 
 Panel content is real HTML. Any value from the receiver, an API, or the user goes
 through `textContent`, or through this if you must build markup:
@@ -909,7 +1107,7 @@ shorter than escaping and cannot be got wrong.
 
 ---
 
-## 13. Before publishing — checklist
+## 14. Before publishing — checklist
 
 - [ ] Wrapped in `<template id="ubersdr-panel">`, with the manifest inside it.
 - [ ] `"ui": 2`, `"schema": 1`, and a `title`, `icon` and `group` that **exist**.
@@ -922,11 +1120,17 @@ shorter than escaping and cannot be got wrong.
       children that grow; anything wide scrolls inside itself.
 - [ ] No `vh`/`vw`, no `height: 100%` on `body`, no `position: fixed`.
 - [ ] Text sized in `em`/`rem` so the panel's zoom buttons work.
-- [ ] `sdr.minimal` honoured if `"minimal": true` is declared.
+- [ ] `"minimal": true` declared and `sdr.minimal` honoured.
+- [ ] The minimal view still *works*: what the panel is for is reachable in it,
+      and nothing appears there that is absent from the full view.
 - [ ] Every store write's return value checked.
 - [ ] No `innerHTML` with data you did not write.
 - [ ] `uses` filled in honestly.
 - [ ] Timers, intervals and listeners cleaned up if the panel can be torn down.
+- [ ] Pointer events, not mouse events; nothing essential behind `:hover`.
+- [ ] Right-click has a long press (timed by hand — iOS sends no `contextmenu`).
+- [ ] Wheel-to-zoom has a pinch; `pointercancel` handled.
+- [ ] `touch-action` set on anything dragged; tap targets at least 44 px.
 - [ ] Absent values shown as `—`; times in UTC and labelled; live numbers with
       fixed decimals and `tabular-nums`.
 - [ ] Loading, empty, degraded and not-available states each say something in
@@ -938,7 +1142,7 @@ shorter than escaping and cannot be got wrong.
 
 ---
 
-## 14. Reference material on the instance
+## 15. Reference material on the instance
 
 **This skill ships inside the container; the receiver serves its own copy of the
 same material. Where they disagree, the receiver is right.**
@@ -1029,7 +1233,7 @@ keep whatever attribution the original carries.
 
 ---
 
-## 15. Managing panels through the admin API
+## 16. Managing panels through the admin API
 
 ### Access
 
@@ -1123,7 +1327,7 @@ WANT="Band Memories"
 BUILTIN=$(wc -l < taken.txt)
 
 # …and the names this operator already has. These are the ones the instance will
-# actually refuse (§15).
+# actually refuse (§16).
 curl -s "$BASE/admin/widgets/mine?ui=any" | jq -r '.widgets[].name' >> taken.txt
 
 # …and what the community publishes. Nothing refuses these — they belong to
@@ -1287,7 +1491,7 @@ irreversible and takes the version history with it.
 
 ---
 
-## 16. Working files
+## 17. Working files
 
 Keep drafts in `panels/` in the working directory. They are scratch — the real
 panels live on the instance behind the admin API, and a local file is only ever a
