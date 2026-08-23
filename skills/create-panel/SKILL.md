@@ -249,8 +249,8 @@ Local bookmarks · Markers · Media controls · Mini Games · Most used
 Multipad · NAVTEX · News · Noise reduction · Notifications · Packet
 Quick bands · Radio control · Ranking · Receiver · Receiver info
 Recorder · Rotator · SDR control · Shortcuts · Signal · Space weather
-Spectrogram · Spots · SSTV · Voice activity · Voice skimmer · Weather
-Weather fax · World clocks
+Spectrogram · Spots · SSTV · VFOs · Voice activity · Voice skimmer
+Weather · Weather fax · World clocks
 ```
 
 That list is the copy baked into this skill; the instance's own is in
