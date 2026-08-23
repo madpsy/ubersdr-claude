@@ -173,8 +173,8 @@ ViewSplit ViewWaterfall Volume Waves Wf2D Wf3D WfBoth Wheel Wind ZoomIn
 ZoomOut
 ```
 
-Unknown names fall back to `Custom`. The authoritative list for the instance you
-are publishing to is `$BASE/v2/dist/panel-meta.json` — fetch it if in doubt:
+Unknown names fall back to `Custom`. This list is the one baked into the image,
+so **the instance's own list wins** — it is in `reference/panel-meta.json`, or:
 
 ```bash
 curl -s "$BASE/v2/dist/panel-meta.json" | jq -r '.icons | join(" ")'
@@ -762,15 +762,37 @@ shorter than escaping and cannot be got wrong.
 
 ## 14. Reference material on the instance
 
-The receiver serves the authoritative documents. Read them when you need detail
-beyond this skill — they match the exact version the user is publishing to:
+**This skill ships inside the container; the receiver serves its own copy of the
+same material. Where they disagree, the receiver is right.**
+
+That is not a hedge, it is how the two are built. This file is baked into the
+image and only changes when the image is rebuilt, while the receiver serves
+documents generated from the code that is actually running on it. So if the
+instance's guide names a manifest field this skill does not mention, or lists an
+icon this skill does not have, believe the instance and say so to the user.
+
+They are fetched into `reference/` when the container starts — **read those files
+first**, they are already on disk:
+
+```
+reference/PANEL_AUTHORING.md   the author's guide, from this receiver
+reference/example-panel.html   a complete worked panel, verified against its parser
+reference/BRIDGE_API.md        topics, commands and functions in full
+reference/panel-meta.json      the icon and group names this build actually has
+```
+
+If they are missing — the fetch is best-effort and the receiver may have been
+unreachable at startup — pull them yourself:
 
 ```bash
-curl -s "$BASE/v2/PANEL_AUTHORING.md"      # the author's guide
-curl -s "$BASE/v2/example-panel.html"      # a complete worked panel
-curl -s "$BASE/v2/BRIDGE_API.md"           # topics, commands, functions in full
-curl -s "$BASE/v2/dist/panel-meta.json"    # the icon and group names this build has
+curl -s "$BASE/v2/PANEL_AUTHORING.md"
+curl -s "$BASE/v2/example-panel.html"
+curl -s "$BASE/v2/BRIDGE_API.md"
+curl -s "$BASE/v2/dist/panel-meta.json"
 ```
+
+And if the receiver serves none of them, it predates custom panels: say so
+plainly rather than publishing a bundle it cannot run.
 
 **Start from the worked example** when the user asks for something non-trivial.
 It is a real panel — it watches `tuning`, stores frequencies, and tunes back to
