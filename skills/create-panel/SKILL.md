@@ -118,6 +118,16 @@ Cheap enough to be worth doing unprompted, and the result is worth restating to
 the user in a line — *"you already have four panels, three enabled, and one of
 them is an SNR meter"* — before you ask what they want built.
 
+**Then read the built-in panel closest to what you are about to build.** They are
+on disk at `reference/src/panels/` (see §14) — sixty of them, already cloned, no
+fetching required. This is not optional polish: it is the difference between a
+panel that looks like it belongs in the dock and one that looks like a debug
+readout, and it is where the wording, the formatting and the layout conventions
+actually live. A readout? Read `SignalPanel.jsx`. A list? `SpotsPanel.jsx`.
+Something remembered per user? `ClocksPanel.jsx`.
+
+Read them for *conventions*, never for structure — see the warning in §14.
+
 ---
 
 ## 2. The bundle
@@ -435,6 +445,13 @@ you should have to arrange. Writes are async and **tell you when they fail** —
 check the return rather than assuming, or the operator sees stale settings for
 ever. Limits: 2 MB per panel, 512 KB per key. Values are structured-cloned, so an
 `ArrayBuffer` or `ImageBitmap` can go in directly.
+
+**Storage is per receiver.** Each receiver a desktop or mobile client opens gets
+its own local port and therefore its own origin, so what a panel stores on one
+receiver is invisible to the same panel on another — the right answer for
+settings about *that* receiver's bands, antennas or frequencies. The desktop
+client's shared-settings feature copies some preferences between receivers; it
+does not copy this.
 
 Storage can be unavailable (private mode, blocked site data). Then the store is
 empty and writes go nowhere — the same experience as a first run. Do not treat it
@@ -917,31 +934,23 @@ them — and it is verified against the server's own parser on every build.
 
 ### Reading the interface's own source
 
-When you need to know how something is *actually* done — how a reading is
-worded, what a formatter rounds to, which token a particular kind of text uses —
-read the interface's own panels. This container has `git`, `curl` and `tar`.
-
-Fetch just the parts worth reading rather than cloning the whole repository,
-which is large and mostly irrelevant:
-
-```bash
-mkdir -p reference
-curl -fsSL "https://github.com/madpsy/ka9q_ubersdr/archive/refs/heads/main.tar.gz" \
-  | tar -xz -C reference --strip-components=4 \
-      "ka9q_ubersdr-main/static/v2/src/panels" \
-      "ka9q_ubersdr-main/static/v2/src/lib/format.js" \
-      "ka9q_ubersdr-main/static/v2/src/styles.css"
-```
-
-That leaves `reference/panels/` (about sixty built-in panels), `reference/lib/format.js`
-and `reference/styles.css`. Worth reading, and what for:
+**It is already on disk.** The container clones it at startup — you do not have
+to fetch anything:
 
 | Path | What you learn |
 |---|---|
-| `panels/*.jsx` | How real panels word their states, lay out rows, and decide what survives the minimal view. |
-| `lib/format.js` | The house formatters — frequencies, `sinceLabel`, why times are UTC, why live figures use fixed decimals. |
-| `styles.css` (the `:root` block) | The authoritative theme tokens. If this skill and that file ever disagree, **that file is right**. |
-| `$BASE/v2/CUSTOM_PANELS.md` | The design and its reasoning — why the frame is sandboxed, what it does and does not buy. |
+| `reference/src/panels/*.jsx` | How real panels word their states, lay out rows, and decide what survives the minimal view. Sixty of them. |
+| `reference/src/lib/format.js` | The house formatters — frequencies, `sinceLabel`, why times are UTC, why live figures use fixed decimals. |
+| `reference/src/styles.css` | The `:root` block is the authoritative theme tokens. If this skill and that file disagree, **that file is right**. |
+| `reference/ubersdr/static/v2/CUSTOM_PANELS.md` | The design and its reasoning — why the frame is sandboxed, what it does and does not buy. |
+
+`reference/src` is a symlink into `reference/ubersdr`, which is a real shallow
+clone of main. So you can refresh it with `git -C reference/ubersdr pull`, or
+widen it with `git -C reference/ubersdr sparse-checkout add <path>` if you need
+something outside `static/v2`.
+
+If it is absent, the clone failed at startup (no network, most likely) — say so
+rather than guessing at conventions, and fall back to what is written here.
 
 Good ones to start with: `SignalPanel.jsx` and `StatusPanel.jsx` for a readout,
 `SpotsPanel.jsx` for a list, `ClocksPanel.jsx` for something stored per user.

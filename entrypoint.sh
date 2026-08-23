@@ -53,6 +53,32 @@ else
   echo "  (instance reference unavailable — the skill is self-contained, so building still works)"
 fi
 
+# The interface's own panel source, so the assistant can read how a real panel
+# words its states, formats a frequency or lays out a row rather than inventing
+# conventions. Sixty files it can grep; the difference between a panel that
+# looks like it belongs and one that looks like a debug readout.
+#
+# A sparse partial clone rather than the repository or a source tarball: blobs
+# are fetched only for the paths asked for, which is about 28 MB and three
+# seconds instead of the whole history of a repo carrying client binaries.
+REF_REPO_URL="${PANEL_REF_REPO:-https://github.com/madpsy/ka9q_ubersdr.git}"
+REF_SRC="$WORK/reference/ubersdr"
+if timeout 120 git clone --depth 1 --filter=blob:none --sparse -q \
+     "$REF_REPO_URL" "$REF_SRC" 2>/dev/null \
+   && timeout 120 git -C "$REF_SRC" sparse-checkout set static/v2 >/dev/null 2>&1 \
+   && [ -d "$REF_SRC/static/v2/src/panels" ]; then
+  # Short paths for the common case, without hiding where they came from. The
+  # clone is left whole — .git and all — so the assistant can `git pull` it or
+  # widen it with `git sparse-checkout add <path>` if it needs something outside
+  # static/v2. Moving the files out and deleting the repo would have saved
+  # nothing and cost both.
+  ln -sfn ubersdr/static/v2/src "$WORK/reference/src"
+  say "Panel source loaded ($(ls "$REF_SRC/static/v2/src/panels" | wc -l) built-in panels in reference/src/panels)."
+else
+  rm -rf "$REF_SRC"
+  echo "  (panel source unavailable — the skill's own conventions still apply)"
+fi
+
 cd "$WORK"
 
 # ---------------------------------------------------------------------------
