@@ -529,7 +529,107 @@ ship into by default.
 
 ---
 
-## 10. House conventions — how the built-in panels do it
+## 10. Composition — making a panel look designed
+
+A panel that is merely *correct* still looks amateur if everything is jammed into
+the top-left corner at body size. The interface has a strong house look and you
+should match it. These patterns are taken from the built-in meters, not invented.
+
+### One reading — the hero pattern
+
+A panel whose job is a single number centres it, makes it large, sets it in the
+monospace face and **colours it with the accent**. The unit follows the number,
+small and faint. The name of the reading is a quiet label, not a heading.
+
+```css
+.reading {
+    display: flex;
+    justify-content: center;      /* centred, not left-aligned */
+    align-items: baseline;        /* number and unit share a baseline */
+    gap: 10px;
+    font-family: var(--mono, ui-monospace, monospace);
+    font-size: 1.7em;             /* em, so the zoom buttons work */
+    font-weight: 600;
+    color: var(--accent, #7aa2f7);
+    font-variant-numeric: tabular-nums;
+}
+.reading__value {
+    min-width: 5ch;               /* reserve the width — see below */
+    text-align: center;
+}
+.reading__unit {
+    font-size: 0.6em;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--text-faint, #6b7482);
+}
+.reading__name {
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text-dim, #9aa4b2);
+}
+```
+
+```html
+<div class="reading">
+  <span class="reading__value" id="v">—</span>
+  <span class="reading__unit">dB</span>
+</div>
+<div class="reading__name">SNR</div>
+```
+
+**Reserve the width in `ch`.** A live number that grows from `7.2` to `-12.4`
+shifts everything around it on every update. `min-width: 5ch` holds the slot open
+so the reading changes and nothing moves. For the same reason, hide an absent
+value with `visibility: hidden` rather than `display: none` — the slot stays.
+
+### Several readings — the two-up grid
+
+Two or three numbers go in a grid of small boxed cells, not a list of rows:
+
+```css
+.readouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.readout {
+    padding: 5px 8px;
+    line-height: 1.25;
+    background: var(--surface-3, #161a21);
+    border: 1px solid var(--border, #39414f);
+    border-radius: var(--radius-sm, 6px);
+    min-width: 0;
+}
+.readout__label { font-size: 0.8em; color: var(--text-dim, #9aa4b2); }
+.readout__value { font-family: var(--mono, monospace); font-variant-numeric: tabular-nums; }
+```
+
+At a narrow width, collapse it to one column:
+
+```css
+@media (max-width: 260px) { .readouts { grid-template-columns: 1fr; } }
+```
+
+### Rhythm and alignment
+
+- **Vertical gap between blocks: 9 px.** Between tight related rows: 4–6 px. The
+  interface's own panel body uses a 9 px stack.
+- **Centre what is a display; left-align what is a list.** A single reading, a
+  clock, a gauge — centred. Rows of spots, settings, or anything scannable —
+  left-aligned, because the eye needs a fixed left edge to run down.
+- **Right-align numbers in a column** so the digits line up, with `tabular-nums`.
+- **Labels above or before, never after.** Small, `--text-dim`, sentence case.
+- **One accent per panel.** The accent colour marks the thing that matters — the
+  reading, or the one control. If three things are accented, none of them is.
+- **Let it breathe.** A panel with 6–9 px of padding around a centred number
+  looks considered; the same content flush to the top-left looks unfinished.
+
+### Before you publish, look at it
+
+Ask yourself, honestly: *if this were a built-in panel, would it look out of
+place?* If the answer is "it looks like a debug readout", it is not finished —
+centre it, size it, colour the number, and give it room.
+
+---
+
+## 11. House conventions — how the built-in panels do it
 
 Match these and the panel reads as part of the interface rather than as a guest.
 They are drawn from what the interface's own panels and formatters actually do.
@@ -615,7 +715,7 @@ word or a shape, for the operator who cannot distinguish them.
 
 ---
 
-## 11. Escaping — always, for anything you did not write
+## 12. Escaping — always, for anything you did not write
 
 Panel content is real HTML. Any value from the receiver, an API, or the user goes
 through `textContent`, or through this if you must build markup:
@@ -631,7 +731,7 @@ shorter than escaping and cannot be got wrong.
 
 ---
 
-## 12. Before publishing — checklist
+## 13. Before publishing — checklist
 
 - [ ] Wrapped in `<template id="ubersdr-panel">`, with the manifest inside it.
 - [ ] `"ui": 2`, `"schema": 1`, and a `title`, `icon` and `group` that **exist**.
@@ -653,10 +753,14 @@ shorter than escaping and cannot be got wrong.
       fixed decimals and `tabular-nums`.
 - [ ] Loading, empty, degraded and not-available states each say something in
       plain words.
+- [ ] It looks *composed*: a single reading is centred, large, in `--mono` and
+      accent-coloured, with the unit small and faint after it; live values have
+      their width reserved in `ch` so nothing shifts. Not a debug readout in the
+      top-left corner.
 
 ---
 
-## 13. Reference material on the instance
+## 14. Reference material on the instance
 
 The receiver serves the authoritative documents. Read them when you need detail
 beyond this skill — they match the exact version the user is publishing to:
@@ -732,7 +836,7 @@ keep whatever attribution the original carries.
 
 ---
 
-## 14. Managing panels through the admin API
+## 15. Managing panels through the admin API
 
 ### Access
 
@@ -930,7 +1034,7 @@ irreversible and takes the version history with it.
 
 ---
 
-## 15. Working files
+## 16. Working files
 
 Keep drafts in `panels/` in the working directory. They are scratch — the real
 panels live on the instance behind the admin API, and a local file is only ever a
