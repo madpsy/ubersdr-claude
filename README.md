@@ -1,6 +1,6 @@
 # ubersdr-claude
 
-Sandboxed **Claude Code** for authoring UberSDR widgets — the container behind
+Sandboxed **Claude Code** for authoring UberSDR panels — the container behind
 the Admin panel's *✨ AI Widget Assistant*.
 
 Claude runs inside a locked-down container instead of loose on the host:
@@ -13,7 +13,7 @@ Claude runs inside a locked-down container instead of loose on the host:
 - the admin password arrives as a single env var (`UBERSDR_ADMIN_PASSWORD`),
   never a mounted config volume
 
-Claude's trust boundary is therefore "anything the widget admin API allows, and
+Claude's trust boundary is therefore "anything the panel admin API allows, and
 nothing else" — it cannot traverse the host, read `config.yaml`, or touch other
 containers.
 
@@ -21,9 +21,9 @@ containers.
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Node 20 base + Claude Code + the widget tooling |
+| `Dockerfile` | Node 20 base + Claude Code + the panel tooling |
 | `entrypoint.sh` | Refreshes the baked-in skills, prepares a scratch dir, execs `claude` |
-| `skills/` | Bundled Claude skills (`create-widget`), baked into the image |
+| `skills/` | Bundled Claude skills (`create-panel`), baked into the image |
 | `docker.sh` | Build / push helper (`build`, `arm64`, `push`, `run`) |
 
 ## Build / push

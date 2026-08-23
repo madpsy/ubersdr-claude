@@ -1,13 +1,13 @@
-# ubersdr-claude — sandboxed Claude Code for UberSDR widget authoring.
+# ubersdr-claude — sandboxed Claude Code for UberSDR panel authoring.
 #
-# Runs Claude Code with the bundled create-widget skill inside a locked-down
+# Runs Claude Code with the bundled create-panel skill inside a locked-down
 # container: non-root user, read-only root filesystem at runtime (see the
 # compose service), no host mounts except a private home volume for auth state.
 # Claude reaches only the admin API (via the sdr-network) and the Anthropic API.
 FROM node:20-slim
 
-# Runtime tools used by the widget workflow:
-#   curl/tar — fetch reference widgets + skill refresh
+# Runtime tools used by the panel workflow:
+#   curl/tar — fetch the instance's authoring reference + skill refresh
 #   jq       — the admin-API recipes
 #   git      — optional deeper repo inspection by the skill
 #   tini     — proper PID 1 / signal handling for the interactive session
