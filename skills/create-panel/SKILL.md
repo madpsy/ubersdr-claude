@@ -37,8 +37,17 @@ description: Create, list, or edit panels for the UberSDR interface — a panel 
 > Spell out exactly which panels would be affected and what happens to each (by
 > `name` and `widget_id`), then wait for approval **before** the first mutating
 > call. Do not begin the batch, do part of it, or treat a vague plural as
-> pre-approval. A single-panel action needs no such confirmation. Read-only
-> requests are never gated — this is about **mutations** only.
+> pre-approval. Read-only requests are never gated — this is about **mutations**
+> only.
+>
+> 🗑️ **Deleting is confirmed every time, even for one panel.** It is the single
+> exception to "one panel needs no confirmation": every other action here can be
+> undone — a bad edit rolls back to a previous version, an unpublish republishes,
+> a disable re-enables — and deletion cannot. It takes the panel's whole version
+> history with it and there is no copy on the instance afterwards. So name the
+> panel and its `widget_id` back to the user, say the history goes too, and wait
+> for a clear yes before calling `/admin/widgets/delete`. See §16, *Publish,
+> unpublish, delete*.
 
 ---
 
@@ -208,6 +217,36 @@ external `<script src>`, no external stylesheet, no `<base href>`, no
 `defaultHidden`, `fill`, `weight` and `height` apply only when a layout is first
 built. After that the arrangement belongs to the operator, and publishing a new
 version will not move the panel about on them.
+
+**Ask where it opens — do not pick the dock silently.** `dock` is the one
+manifest key whose right answer lives with the operator rather than in the code,
+and because it only applies when the layout is first built, guessing wrong is not
+a one-line fix afterwards: the panel is already placed, and a new version will
+not move it. So before you create a panel, ask, offering the three docks and
+saying what each is for:
+
+- **left** — the default, and where most readouts belong.
+- **right** — the other side column, same 220–560 px width. Use it to keep a new
+  panel away from whatever the operator already has stacked on the left.
+- **bottom** — the full-window strip. The right answer for anything wide: a
+  table, a waterfall, a spots list, a chart with a time axis. Panels there share
+  the width by `weight`, and `fill: true` stretches to the dock's height.
+
+Ask it as part of confirming the name (§16, *Create*), in one sentence — *"Left
+dock, or would you rather it went right or along the bottom?"* — with your own
+recommendation first, drawn from the shape of what you are building. Take a
+plain answer as given; if they do not care, say which you are using and carry on.
+Never leave it to the fallback: an unrecognised value quietly becomes `left`, so
+a wide panel with a mistyped dock ends up 220 px wide and looks broken.
+
+**Floating is not a manifest option.** There is no fourth `dock` value for it,
+and no key that ships a panel as a floating window. Floating is something the
+operator does — they drag the panel out of its dock, and where it lands is
+remembered for them. So if they ask for floating by default, say so plainly and
+agree a dock for the first run: *"A panel can't ship floating, but you can drag
+it out of the dock any time and it'll stay there — which dock should it start
+in?"* Same for the phone, where there are no docks at all and every panel is a
+sheet in the tab row.
 
 **`uses` is a declaration, not a permission request.** Nothing enforces it. It is
 there so an operator deciding whether to enable the panel can see what it does.
@@ -1111,6 +1150,8 @@ shorter than escaping and cannot be got wrong.
 
 - [ ] Wrapped in `<template id="ubersdr-panel">`, with the manifest inside it.
 - [ ] `"ui": 2`, `"schema": 1`, and a `title`, `icon` and `group` that **exist**.
+- [ ] `dock` is the one the operator asked for — not a silent default — and a
+      wide panel is in `bottom`, with `weight`/`fill` set if it needs them.
 - [ ] Code is `<script type="module">`.
 - [ ] No `<html>`/`<head>`/`<body>`, no external script or stylesheet.
 - [ ] First line is `await ubersdr.ready()`; nothing touches `sdr` before it.
@@ -1311,6 +1352,15 @@ description drawn from what was asked, confirm in a sentence — *"I'll call it
 'Band Memories' — remembers frequencies and tunes back to them. OK?"* — then
 submit. Only stop to ask outright if the request is too vague to name.
 
+**Ask which dock it starts in at the same time**, unless the user has already
+said. One question, both answers, before you write the bundle — *"I'll call it
+'Band Memories' — remembers frequencies and tunes back to them. Left dock, or
+right, or along the bottom?"* Recommend one rather than presenting a bare menu:
+left for a readout, bottom for anything wide. `dock` only applies when the layout
+is first built (§3), so this is the one chance to get it right without the
+operator having to drag it themselves — and if they ask for it floating, tell
+them that is theirs to do, not the manifest's.
+
 **Check the name is free first — actually run this**, do not go from the list
 baked into this skill, which is a copy and may be older than the receiver:
 
@@ -1479,15 +1529,48 @@ discoverable and enable-able by every other instance; flipping it to `false`
 withdraws it from the catalogue, and any instance that already had it enabled
 loses it.
 
-Before **deleting** a public panel, check who is using it:
+**Deletion is irreversible, and always confirmed first.** It takes the version
+history with it, the admin API has no undelete, and nothing else in this skill
+destroys anything — so a delete is never carried out on the strength of the
+request alone, however plainly it was put and however small the panel. Ask, in a
+sentence that names what goes:
+
+> *"Delete 'Band Memories' (`aaaa-bbbb-…`)? That removes the panel and all 6 of
+> its versions — it can't be undone. Confirm and I'll do it."*
+
+Then wait. Do not fetch-and-delete in one breath, do not treat "yes" to some
+earlier question as covering this one, and do not read *"get rid of the old SNR
+meter"* as approval already given — it is the request, not the confirmation. If
+the answer is anything other than a clear yes, stop and leave the panel alone.
+
+Before deleting, it is worth saying whether there is a gentler option, because
+usually there is: disabling takes it out of the interface, unpublishing withdraws
+it from the catalogue, and both are reversible. Offer that when the reason they
+gave — *"I don't use it"*, *"it's cluttering the layout"* — is one that disabling
+would actually solve.
+
+Take a local copy first, so the bundle survives even though the record does not
+— the same two calls the *Edit* recipe opens with:
+
+```bash
+VER=$(curl -s "$BASE/admin/widgets/versions?widget_id=$WID" | jq -r '.versions[0].version')
+curl -s "$BASE/admin/widgets/version?widget_id=$WID&version=$VER" \
+  | jq -r .html_content > "panels/deleted_$WID.html"
+```
+
+Say where you put it. It is a working file in this container, not a backup on the
+instance — it lives exactly as long as the container does, so if the panel
+matters to them beyond this session, that copy is worth keeping somewhere else.
+
+And if the panel is **public**, check who else is using it before you ask:
 
 ```bash
 curl -s "$BASE/admin/widgets/public-with-instances?ui=any" \
   | jq -r --arg id "$WID" '.widgets[] | select(.widget_id==$id) | .enabled_by | length'
 ```
 
-Say how many other instances would lose it, and get an explicit yes. Deletion is
-irreversible and takes the version history with it.
+Say how many other instances would lose it — that number belongs in the question,
+not in a note afterwards — and get an explicit yes.
 
 ---
 
