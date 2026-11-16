@@ -140,6 +140,8 @@ push() {
     docker buildx build \
         --platform "$platforms" \
         --tag "$IMAGE" \
+        --pull \
+        --no-cache \
         --push \
         "$TMPCTX"
     echo "Pushed multi-arch manifest: $IMAGE"

@@ -282,13 +282,14 @@ uses — do not reuse one:
 ```
 Addons · Announcements · Antenna switch · Audio · Audio filters
 Audio scope · Backup · Band plan · Bands · Band Spectrum · Bookmarks
-Callsign lookup · Chat · Display · Doppler · DX cluster · Events
-Extensions · HFDL · IF Spectrum · Layout · Lightning · Listeners
-Local bookmarks · Markers · Media controls · Mini Games · Most used
-Multipad · NAVTEX · News · Noise reduction · Notifications · Packet
-Quick bands · Radio control · Ranking · Receiver · Receiver info
-Recorder · Rotator · SDR control · Shortcuts · Signal · Space weather
-Spectrogram · Spots · SSTV · VFOs · Voice activity · Voice skimmer
+Callsign lookup · Chat · Display · Doppler · DX cluster · DXpeditions
+Events · Extensions · HFDL · IF Spectrum · IQ Demod · Layout · Lightning
+Listeners · Local bookmarks · Markers · Measure · Media controls
+Mini Games · Most used · Multipad · NAVTEX · NCDXF Beacons · NDB · News
+Noise reduction · Notifications · Packet · Quick bands · Radio control
+Ranking · Receiver · Receiver info · Recorder · Rotator · Scanner
+SDR control · Shortcuts · Signal · Space weather · Spectrogram · Spots
+SSTV · Stats · Time · Timeshift · VFOs · Voice activity · Voice skimmer
 Weather · Weather fax · World clocks
 ```
 
@@ -317,13 +318,13 @@ receiver's.
 beside it:
 
 ```
-Anchor Announce Antenna Archive Bars Bell Bolt Bookmark Captions Chat
-Chevron ChevronLeft ChevronRight ChevronUp Clock Close Cloud Collapse
+Anchor Announce Antenna Archive Bars Bell Bolt Bookmark Callipers Captions
+Chat Chevron ChevronLeft ChevronRight ChevronUp Clock Close Cloud Collapse
 Compass Copy Custom Dice Download Drag Expand External Eye EyeOff Fax Gauge
 Grid Info Keyboard Knob Layers Link List LockScreen Mic Minus Moon Morse
 Mute News Packet Pad Pause Picture Play Plug Plus Podium Pointer Power
-Puzzle Radio Record Reset RotateLeft RotateRight Search Share Sliders Snail
-Span Stop Sun Target Teleprinter Tick Trash Upload Users ViewSpectrum
+Puzzle Radio Record Reset RotateLeft RotateRight Scan Search Share Sliders
+Snail Span Stop Sun Target Teleprinter Tick Trace Trash Upload Users ViewSpectrum
 ViewSplit ViewWaterfall Volume Waves Wf2D Wf3D WfBoth Wheel Wind ZoomIn
 ZoomOut
 ```

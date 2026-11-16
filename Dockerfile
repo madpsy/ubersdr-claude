@@ -4,7 +4,7 @@
 # container: non-root user, read-only root filesystem at runtime (see the
 # compose service), no host mounts except a private home volume for auth state.
 # Claude reaches only the admin API (via the sdr-network) and the Anthropic API.
-FROM node:20-slim
+FROM node:26-slim
 
 # Runtime tools used by the panel workflow:
 #   curl/tar — fetch the instance's authoring reference + skill refresh
@@ -13,13 +13,14 @@ FROM node:20-slim
 #   tini     — proper PID 1 / signal handling for the interactive session
 #   ca-certificates — TLS to api.anthropic.com and the collector proxy
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl tar jq git tini \
  && rm -rf /var/lib/apt/lists/*
 
 # Claude Code, installed system-wide (/usr/local) so it lives on the read-only
 # root filesystem and is never shadowed by the /home volume.
-RUN npm install -g @anthropic-ai/claude-code \
+RUN npm install -g npm@latest @anthropic-ai/claude-code@latest \
  && npm cache clean --force
 
 # The root filesystem is read-only at runtime and the CLI runs as an
